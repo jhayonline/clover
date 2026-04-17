@@ -22,28 +22,6 @@ Clover is me exploring C++ backend systems in the simplest way I know how. Nothi
 
 ---
 
-# Installation
-
-Use Clover with CMake:
-
-```cmake
-include(FetchContent)
-
-FetchContent_Declare(
-  clover
-  GIT_REPOSITORY https://github.com/your-username/clover.git
-  GIT_TAG main
-)
-
-FetchContent_MakeAvailable(clover)
-
-add_executable(app main.cpp)
-
-target_link_libraries(app PRIVATE clover)
-```
-
----
-
 # Example Project Structure
 
 Clover does not enforce structure, but a typical project might look like this:
@@ -84,19 +62,26 @@ This structure is **optional**—just one way to organize a growing codebase.
 ## Controller
 
 ```cpp
+// src/hello_controller.cpp
+
 #pragma once
-#include "../../../include/router.hpp"
+#include <router.hpp>
+#include <response.hpp>
+#include <routes.hpp>
 
 class HelloController {
 public:
-  static std::string greet(Request req) {
-    return "Hello World";
+  static Response index(Request req) { return Response("Welcome to Clover!"); }
+
+  static Response hello(Request req) {
+    return Response::json(R"({"message": "Hello from Clover!"})");
   }
 
   static Routes routes() {
     return Routes()
-      .prefix("/api/profile")
-      .add("/", "GET", greet);
+      .prefix("/api")
+      .get("/", index)
+      .get("/hello", hello);
   }
 };
 ```
@@ -106,6 +91,8 @@ public:
 ## Model
 
 ```cpp
+// user.hpp
+
 #pragma once
 #include <string>
 
@@ -116,10 +103,7 @@ struct User {
   std::string password;
   std::string name;
   bool is_active;
-};
 
-class UserModel {
-public:
   static bool verify_password(const User &user, const std::string &password) {
     return user.password == password;
   }
@@ -135,14 +119,31 @@ public:
 ---
 
 ## App Routing
+```cpp
+// include/app.hpp
+
+#pragma once
+#include <router.hpp>
+
+class App {
+public:
+  static Router routes();
+};
+```
+
+
 
 ```cpp
+// src/app.cpp
+
 #include "app.hpp"
 #include "controllers/hello_controller.cpp"
 
 Router App::routes() {
   Router router;
+
   router.mount(HelloController::routes());
+
   return router;
 }
 ```
@@ -152,15 +153,23 @@ Router App::routes() {
 ## Entry Point
 
 ```cpp
-#include "../../include/server.hpp"
-#include "app.hpp"
+// src/main.cpp
+
+#include <iostream>
+#include <router.hpp>
+#include <server.hpp>
 
 int main() {
-  Router router = App::routes();
+  std::cout << "🍀 Clover Server starting..." << std::endl;
 
+  // Create and configure server
   Server server("0.0.0.0", 3000);
+  
+  // Attach router and start
   server.use(router);
   server.listen();
+
+  return 0;
 }
 ```
 
