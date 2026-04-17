@@ -1,0 +1,9 @@
+@PACKAGE_INIT@
+
+include("${CMAKE_CURRENT_LIST_DIR}/cloverTargets.cmake")
+
+# Find required dependencies
+find_package(SQLite3 REQUIRED)
+find_package(yaml-cpp REQUIRED)
+
+check_required_components(clover)
