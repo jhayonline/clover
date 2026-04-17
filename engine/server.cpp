@@ -57,6 +57,8 @@ void Server::setup_socket() {
   std::cout << "Server listening on " << host_ << ":" << port_ << std::endl;
 }
 
+// In server.cpp - update parse_request() method
+
 Request Server::parse_request(const std::string &raw_request) {
   Request req;
 
@@ -64,22 +66,54 @@ Request Server::parse_request(const std::string &raw_request) {
   std::istringstream stream(raw_request);
   std::string line;
 
-  // First line: "GET /path HTTP/1.1"
+  // First line: "GET /path?foo=bar&baz=qux HTTP/1.1"
   std::getline(stream, line);
   size_t first_space = line.find(' ');
   size_t second_space = line.find(' ', first_space + 1);
 
   if (first_space != std::string::npos && second_space != std::string::npos) {
     req.method = line.substr(0, first_space);
-    req.path = line.substr(first_space + 1, second_space - first_space - 1);
+    std::string full_path =
+        line.substr(first_space + 1, second_space - first_space - 1);
     req.version = line.substr(second_space + 1);
 
     if (!req.version.empty() && req.version.back() == '\r') {
       req.version.pop_back();
     }
+
+    // Parse query parameters from path
+    size_t query_pos = full_path.find('?');
+    if (query_pos != std::string::npos) {
+      req.path = full_path.substr(0, query_pos);
+      std::string query_string = full_path.substr(query_pos + 1);
+
+      // Parse key=value pairs
+      std::stringstream query_stream(query_string);
+      std::string pair;
+      while (std::getline(query_stream, pair, '&')) {
+        size_t eq_pos = pair.find('=');
+        if (eq_pos != std::string::npos) {
+          std::string key = pair.substr(0, eq_pos);
+          std::string value = pair.substr(eq_pos + 1);
+          // URL decode (simple version - replace %20 with space)
+          size_t pos = 0;
+          while ((pos = value.find('%', pos)) != std::string::npos) {
+            if (pos + 2 < value.length()) {
+              std::string hex = value.substr(pos + 1, 2);
+              char decoded = static_cast<char>(std::stoi(hex, nullptr, 16));
+              value.replace(pos, 3, 1, decoded);
+            }
+            pos++;
+          }
+          req.query[key] = value;
+        }
+      }
+    } else {
+      req.path = full_path;
+    }
   }
 
-  // Parse headers
+  // Parse headers (existing code continues...)
   while (std::getline(stream, line) && line != "\r") {
     if (line.empty() || line == "\r")
       break;
@@ -102,7 +136,7 @@ Request Server::parse_request(const std::string &raw_request) {
     }
   }
 
-  // Parse body
+  // Parse body (existing code continues...)
   std::stringstream body_stream;
   body_stream << stream.rdbuf();
   req.body = body_stream.str();
@@ -111,7 +145,15 @@ Request Server::parse_request(const std::string &raw_request) {
     req.body.pop_back();
   }
 
-  std::cout << req.method << " " << req.path << std::endl;
+  std::cout << req.method << " " << req.path;
+  if (!req.query.empty()) {
+    std::cout << " [query: ";
+    for (const auto &[k, v] : req.query) {
+      std::cout << k << "=" << v << " ";
+    }
+    std::cout << "]";
+  }
+  std::cout << std::endl;
 
   return req;
 }
