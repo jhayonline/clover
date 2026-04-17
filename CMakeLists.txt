@@ -41,7 +41,7 @@ add_library(clover STATIC
 )
 
 # Include directories
-target_include_directories(clover 
+target_include_directories(clover
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/include
     PRIVATE
@@ -61,6 +61,9 @@ set_target_properties(clover PROPERTIES
     OUTPUT_NAME clover
 )
 
-# Create a simple executable for testing (optional)
-add_executable(clover_server engine/main.cpp)
-target_link_libraries(clover_server clover)
+# Only build the example server if this is the main project (not being fetched)
+if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
+    # Create a simple executable for testing
+    add_executable(clover_server engine/main.cpp)
+    target_link_libraries(clover_server clover)
+endif()
