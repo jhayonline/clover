@@ -159,17 +159,67 @@ Request Server::parse_request(const std::string &raw_request) {
 }
 
 void Server::handle_client(int client_fd) {
-  char buffer[4096] = {0};
+  std::string full_request;
+  char buffer[1024];
 
-  int bytes_read = read(client_fd, buffer, sizeof(buffer) - 1);
-  if (bytes_read < 0) {
-    std::cerr << "Failed to read from socket" << std::endl;
+  // Read until we have a complete HTTP request
+  bool headers_complete = false;
+  int content_length = 0;
+
+  while (true) {
+    int bytes_read = read(client_fd, buffer, sizeof(buffer) - 1);
+    if (bytes_read <= 0) {
+      if (bytes_read < 0) {
+        std::cerr << "Failed to read from socket" << std::endl;
+      }
+      break;
+    }
+
+    buffer[bytes_read] = '\0';
+    full_request += buffer;
+
+    // Check if we've received all headers
+    if (!headers_complete) {
+      size_t header_end = full_request.find("\r\n\r\n");
+      if (header_end != std::string::npos) {
+        headers_complete = true;
+
+        // Parse Content-Length header
+        size_t cl_pos = full_request.find("Content-Length:");
+        if (cl_pos != std::string::npos) {
+          size_t line_end = full_request.find("\r\n", cl_pos);
+          std::string cl_line = full_request.substr(cl_pos, line_end - cl_pos);
+          content_length =
+              std::stoi(cl_line.substr(16)); // "Content-Length: " length
+        }
+      }
+    }
+
+    // If we have headers and know content length, check if we have all body
+    if (headers_complete && content_length > 0) {
+      size_t body_start = full_request.find("\r\n\r\n") + 4;
+      size_t body_received = full_request.length() - body_start;
+      if (body_received >= static_cast<size_t>(content_length)) {
+        break;
+      }
+    } else if (headers_complete && content_length == 0) {
+      break; // No body to read
+    }
+
+    // Safety limit - don't read more than 10MB
+    if (full_request.length() > 10 * 1024 * 1024) {
+      std::cerr << "Request too large" << std::endl;
+      break;
+    }
+  }
+
+  if (full_request.empty()) {
     close(client_fd);
     return;
   }
 
   // Parse request
-  Request req = parse_request(std::string(buffer));
+  Request req = parse_request(full_request);
 
   // Route request
   Response res;
