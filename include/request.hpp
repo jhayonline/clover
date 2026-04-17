@@ -1,4 +1,5 @@
 #pragma once
+#include <nlohmann/json.hpp>
 #include <string>
 #include <unordered_map>
 
@@ -15,6 +16,14 @@ public:
   std::string body;
 
   // Helper methods
-  std::string get_query(const std::string &key) const;
+  std::string get_query(const std::string &key,
+                        const std::string &default_value = "") const;
   std::string get_header(const std::string &key) const;
+
+  // JSON parsing
+  nlohmann::json json() const;
+  template <typename T> T json_as() const { return json().get<T>(); }
+
+  // Form data parsing
+  std::unordered_map<std::string, std::string> form_data() const;
 };
